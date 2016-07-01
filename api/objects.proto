@@ -218,3 +218,20 @@ message Cluster {
 	// a new key is allocated on key rotation.
 	uint64 encryption_key_lamport_clock = 6;
 }
+
+// ExecutorAttachment specifies the allocation state
+// for the connection of a container to a network.
+message ExecutorAttachment {
+	string id = 1 [(gogoproto.customname) = "ID"];
+
+	Meta meta = 2 [(gogoproto.nullable) = false];
+
+	// NodeID specifies the node where the attachment is taking place.
+	string node_id = 3 [(gogoproto.customname) = "NodeID"];
+
+	ExecutorAttachmentSpec spec = 4 [(gogoproto.nullable) = false];
+
+	NetworkAttachment attachment = 5;
+	
+	AttachmentStatus status = 6 [(gogoproto.nullable) = false];
+}

@@ -324,11 +324,27 @@ func (na *NetworkAllocator) DeallocateTask(t *api.Task) error {
 	return na.releaseEndpoints(t.Networks)
 }
 
+// AllocateAttachment allocates the resources for the network attachment.
+func (na *NetworkAllocator) AllocateAttachment(t *api.ExecutorAttachment) error {
+	if err := na.allocateNetworkIPs(t.Attachment); err != nil {
+		if err := na.releaseEndpoints([]*api.NetworkAttachment{t.Attachment}); err != nil {
+			log.G(context.TODO()).Errorf("Failed to release IP addresses while rolling back allocation for attachment %s network %s: %v", t.ID, t.Attachment.Network.ID, err)
+		}
+		return fmt.Errorf("failed to allocate network IP for attachment %s network %s: %v", t.ID, t.Attachment.Network.ID, err)
+	}
+	return nil
+}
+
+// DeallocateAttachment releases the resources for the network attachment.
+func (na *NetworkAllocator) DeallocateAttachment(t *api.ExecutorAttachment) error {
+	return na.releaseEndpoints([]*api.NetworkAttachment{t.Attachment})
+}
+
 func (na *NetworkAllocator) releaseEndpoints(networks []*api.NetworkAttachment) error {
 	for _, nAttach := range networks {
 		ipam, _, err := na.resolveIPAM(nAttach.Network)
 		if err != nil {
-			return fmt.Errorf("failed to resolve IPAM while allocating : %v", err)
+			return fmt.Errorf("failed to resolve IPAM while deallocating : %v", err)
 		}
 
 		localNet := na.getNetwork(nAttach.Network.ID)

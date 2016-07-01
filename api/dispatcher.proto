@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package docker.swarmkit.v1;
 
+import "specs.proto";
 import "types.proto";
 import "objects.proto";
 import "gogoproto/gogo.proto";
@@ -46,6 +47,19 @@ service Dispatcher { // maybe dispatch, al likes this
 	// of tasks which should be run on node, if task is not present in that list,
 	// it should be terminated.
 	rpc Tasks(TasksRequest) returns (stream TasksMessage) {
+		option (docker.protobuf.plugin.tls_authorization) = { roles: "swarm-worker" roles: "swarm-manager" };
+	};
+
+	// ExecutorAttachments is a stream of container attachment resources
+	// allocated for the node.
+	rpc ExecutorAttachments(ExecutorAttachmentsRequest) returns (stream ExecutorAttachmentMessage) {
+		option (docker.protobuf.plugin.tls_authorization) = { roles: "swarm-worker" roles: "swarm-manager" };
+	};
+
+	rpc CreateExecutorAttachment(CreateExecutorAttachmentRequest) returns (CreateExecutorAttachmentResponse) {
+		option (docker.protobuf.plugin.tls_authorization) = { roles: "swarm-worker" roles: "swarm-manager" };
+	};
+	rpc RemoveExecutorAttachment(RemoveExecutorAttachmentRequest) returns (RemoveExecutorAttachmentResponse) {
 		option (docker.protobuf.plugin.tls_authorization) = { roles: "swarm-worker" roles: "swarm-manager" };
 	};
 }
@@ -152,3 +166,25 @@ message TasksMessage {
 	repeated Task tasks = 1;
 }
 
+message ExecutorAttachmentsRequest {
+	string session_id = 1 [(gogoproto.customname) = "SessionID"];
+}
+
+message ExecutorAttachmentMessage {
+	// Attachments is the set of executor attachments that have been allocated for the node.
+	repeated ExecutorAttachment attachments = 1;
+}
+
+message CreateExecutorAttachmentRequest {
+	ExecutorAttachmentSpec spec = 1;
+}
+
+message CreateExecutorAttachmentResponse {
+	string id = 1 [(gogoproto.customname) = "ID"];
+}
+
+message RemoveExecutorAttachmentRequest {
+	string id = 1 [(gogoproto.customname) = "ID"];
+}
+
+message RemoveExecutorAttachmentResponse {}

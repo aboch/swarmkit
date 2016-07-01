@@ -175,6 +175,66 @@ func (m *TasksMessage) Reset()                    { *m = TasksMessage{} }
 func (*TasksMessage) ProtoMessage()               {}
 func (*TasksMessage) Descriptor() ([]byte, []int) { return fileDescriptorDispatcher, []int{7} }
 
+type ExecutorAttachmentsRequest struct {
+	SessionID string `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+}
+
+func (m *ExecutorAttachmentsRequest) Reset()      { *m = ExecutorAttachmentsRequest{} }
+func (*ExecutorAttachmentsRequest) ProtoMessage() {}
+func (*ExecutorAttachmentsRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptorDispatcher, []int{8}
+}
+
+type ExecutorAttachmentMessage struct {
+	// Attachments is the set of executor attachments that have been allocated for the node.
+	Attachments []*ExecutorAttachment `protobuf:"bytes,1,rep,name=attachments" json:"attachments,omitempty"`
+}
+
+func (m *ExecutorAttachmentMessage) Reset()      { *m = ExecutorAttachmentMessage{} }
+func (*ExecutorAttachmentMessage) ProtoMessage() {}
+func (*ExecutorAttachmentMessage) Descriptor() ([]byte, []int) {
+	return fileDescriptorDispatcher, []int{9}
+}
+
+type CreateExecutorAttachmentRequest struct {
+	Spec *ExecutorAttachmentSpec `protobuf:"bytes,1,opt,name=spec" json:"spec,omitempty"`
+}
+
+func (m *CreateExecutorAttachmentRequest) Reset()      { *m = CreateExecutorAttachmentRequest{} }
+func (*CreateExecutorAttachmentRequest) ProtoMessage() {}
+func (*CreateExecutorAttachmentRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptorDispatcher, []int{10}
+}
+
+type CreateExecutorAttachmentResponse struct {
+	ID string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+}
+
+func (m *CreateExecutorAttachmentResponse) Reset()      { *m = CreateExecutorAttachmentResponse{} }
+func (*CreateExecutorAttachmentResponse) ProtoMessage() {}
+func (*CreateExecutorAttachmentResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptorDispatcher, []int{11}
+}
+
+type RemoveExecutorAttachmentRequest struct {
+	ID string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+}
+
+func (m *RemoveExecutorAttachmentRequest) Reset()      { *m = RemoveExecutorAttachmentRequest{} }
+func (*RemoveExecutorAttachmentRequest) ProtoMessage() {}
+func (*RemoveExecutorAttachmentRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptorDispatcher, []int{12}
+}
+
+type RemoveExecutorAttachmentResponse struct {
+}
+
+func (m *RemoveExecutorAttachmentResponse) Reset()      { *m = RemoveExecutorAttachmentResponse{} }
+func (*RemoveExecutorAttachmentResponse) ProtoMessage() {}
+func (*RemoveExecutorAttachmentResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptorDispatcher, []int{13}
+}
+
 func init() {
 	proto.RegisterType((*SessionRequest)(nil), "docker.swarmkit.v1.SessionRequest")
 	proto.RegisterType((*SessionMessage)(nil), "docker.swarmkit.v1.SessionMessage")
@@ -185,6 +245,12 @@ func init() {
 	proto.RegisterType((*UpdateTaskStatusResponse)(nil), "docker.swarmkit.v1.UpdateTaskStatusResponse")
 	proto.RegisterType((*TasksRequest)(nil), "docker.swarmkit.v1.TasksRequest")
 	proto.RegisterType((*TasksMessage)(nil), "docker.swarmkit.v1.TasksMessage")
+	proto.RegisterType((*ExecutorAttachmentsRequest)(nil), "docker.swarmkit.v1.ExecutorAttachmentsRequest")
+	proto.RegisterType((*ExecutorAttachmentMessage)(nil), "docker.swarmkit.v1.ExecutorAttachmentMessage")
+	proto.RegisterType((*CreateExecutorAttachmentRequest)(nil), "docker.swarmkit.v1.CreateExecutorAttachmentRequest")
+	proto.RegisterType((*CreateExecutorAttachmentResponse)(nil), "docker.swarmkit.v1.CreateExecutorAttachmentResponse")
+	proto.RegisterType((*RemoveExecutorAttachmentRequest)(nil), "docker.swarmkit.v1.RemoveExecutorAttachmentRequest")
+	proto.RegisterType((*RemoveExecutorAttachmentResponse)(nil), "docker.swarmkit.v1.RemoveExecutorAttachmentResponse")
 }
 
 type authenticatedWrapperDispatcherServer struct {
@@ -229,6 +295,30 @@ func (p *authenticatedWrapperDispatcherServer) Tasks(r *TasksRequest, stream Dis
 		return err
 	}
 	return p.local.Tasks(r, stream)
+}
+
+func (p *authenticatedWrapperDispatcherServer) ExecutorAttachments(r *ExecutorAttachmentsRequest, stream Dispatcher_ExecutorAttachmentsServer) error {
+
+	if err := p.authorize(stream.Context(), []string{"swarm-worker", "swarm-manager"}); err != nil {
+		return err
+	}
+	return p.local.ExecutorAttachments(r, stream)
+}
+
+func (p *authenticatedWrapperDispatcherServer) CreateExecutorAttachment(ctx context.Context, r *CreateExecutorAttachmentRequest) (*CreateExecutorAttachmentResponse, error) {
+
+	if err := p.authorize(ctx, []string{"swarm-worker", "swarm-manager"}); err != nil {
+		return nil, err
+	}
+	return p.local.CreateExecutorAttachment(ctx, r)
+}
+
+func (p *authenticatedWrapperDispatcherServer) RemoveExecutorAttachment(ctx context.Context, r *RemoveExecutorAttachmentRequest) (*RemoveExecutorAttachmentResponse, error) {
+
+	if err := p.authorize(ctx, []string{"swarm-worker", "swarm-manager"}); err != nil {
+		return nil, err
+	}
+	return p.local.RemoveExecutorAttachment(ctx, r)
 }
 
 func (m *SessionRequest) Copy() *SessionRequest {
@@ -365,6 +455,81 @@ func (m *TasksMessage) Copy() *TasksMessage {
 	return o
 }
 
+func (m *ExecutorAttachmentsRequest) Copy() *ExecutorAttachmentsRequest {
+	if m == nil {
+		return nil
+	}
+
+	o := &ExecutorAttachmentsRequest{
+		SessionID: m.SessionID,
+	}
+
+	return o
+}
+
+func (m *ExecutorAttachmentMessage) Copy() *ExecutorAttachmentMessage {
+	if m == nil {
+		return nil
+	}
+
+	o := &ExecutorAttachmentMessage{}
+
+	if m.Attachments != nil {
+		o.Attachments = make([]*ExecutorAttachment, 0, len(m.Attachments))
+		for _, v := range m.Attachments {
+			o.Attachments = append(o.Attachments, v.Copy())
+		}
+	}
+
+	return o
+}
+
+func (m *CreateExecutorAttachmentRequest) Copy() *CreateExecutorAttachmentRequest {
+	if m == nil {
+		return nil
+	}
+
+	o := &CreateExecutorAttachmentRequest{
+		Spec: m.Spec.Copy(),
+	}
+
+	return o
+}
+
+func (m *CreateExecutorAttachmentResponse) Copy() *CreateExecutorAttachmentResponse {
+	if m == nil {
+		return nil
+	}
+
+	o := &CreateExecutorAttachmentResponse{
+		ID: m.ID,
+	}
+
+	return o
+}
+
+func (m *RemoveExecutorAttachmentRequest) Copy() *RemoveExecutorAttachmentRequest {
+	if m == nil {
+		return nil
+	}
+
+	o := &RemoveExecutorAttachmentRequest{
+		ID: m.ID,
+	}
+
+	return o
+}
+
+func (m *RemoveExecutorAttachmentResponse) Copy() *RemoveExecutorAttachmentResponse {
+	if m == nil {
+		return nil
+	}
+
+	o := &RemoveExecutorAttachmentResponse{}
+
+	return o
+}
+
 func (this *SessionRequest) GoString() string {
 	if this == nil {
 		return "nil"
@@ -473,6 +638,69 @@ func (this *TasksMessage) GoString() string {
 	s = append(s, "}")
 	return strings.Join(s, "")
 }
+func (this *ExecutorAttachmentsRequest) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 5)
+	s = append(s, "&api.ExecutorAttachmentsRequest{")
+	s = append(s, "SessionID: "+fmt.Sprintf("%#v", this.SessionID)+",\n")
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *ExecutorAttachmentMessage) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 5)
+	s = append(s, "&api.ExecutorAttachmentMessage{")
+	if this.Attachments != nil {
+		s = append(s, "Attachments: "+fmt.Sprintf("%#v", this.Attachments)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *CreateExecutorAttachmentRequest) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 5)
+	s = append(s, "&api.CreateExecutorAttachmentRequest{")
+	if this.Spec != nil {
+		s = append(s, "Spec: "+fmt.Sprintf("%#v", this.Spec)+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *CreateExecutorAttachmentResponse) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 5)
+	s = append(s, "&api.CreateExecutorAttachmentResponse{")
+	s = append(s, "ID: "+fmt.Sprintf("%#v", this.ID)+",\n")
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *RemoveExecutorAttachmentRequest) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 5)
+	s = append(s, "&api.RemoveExecutorAttachmentRequest{")
+	s = append(s, "ID: "+fmt.Sprintf("%#v", this.ID)+",\n")
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *RemoveExecutorAttachmentResponse) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 4)
+	s = append(s, "&api.RemoveExecutorAttachmentResponse{")
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
 func valueToGoStringDispatcher(v interface{}, typ string) string {
 	rv := reflect.ValueOf(v)
 	if rv.IsNil() {
@@ -534,6 +762,11 @@ type DispatcherClient interface {
 	// of tasks which should be run on node, if task is not present in that list,
 	// it should be terminated.
 	Tasks(ctx context.Context, in *TasksRequest, opts ...grpc.CallOption) (Dispatcher_TasksClient, error)
+	// ExecutorAttachments is a stream of container attachment resources
+	// allocated for the node.
+	ExecutorAttachments(ctx context.Context, in *ExecutorAttachmentsRequest, opts ...grpc.CallOption) (Dispatcher_ExecutorAttachmentsClient, error)
+	CreateExecutorAttachment(ctx context.Context, in *CreateExecutorAttachmentRequest, opts ...grpc.CallOption) (*CreateExecutorAttachmentResponse, error)
+	RemoveExecutorAttachment(ctx context.Context, in *RemoveExecutorAttachmentRequest, opts ...grpc.CallOption) (*RemoveExecutorAttachmentResponse, error)
 }
 
 type dispatcherClient struct {
@@ -626,6 +859,56 @@ func (x *dispatcherTasksClient) Recv() (*TasksMessage, error) {
 	return m, nil
 }
 
+func (c *dispatcherClient) ExecutorAttachments(ctx context.Context, in *ExecutorAttachmentsRequest, opts ...grpc.CallOption) (Dispatcher_ExecutorAttachmentsClient, error) {
+	stream, err := grpc.NewClientStream(ctx, &_Dispatcher_serviceDesc.Streams[2], c.cc, "/docker.swarmkit.v1.Dispatcher/ExecutorAttachments", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &dispatcherExecutorAttachmentsClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type Dispatcher_ExecutorAttachmentsClient interface {
+	Recv() (*ExecutorAttachmentMessage, error)
+	grpc.ClientStream
+}
+
+type dispatcherExecutorAttachmentsClient struct {
+	grpc.ClientStream
+}
+
+func (x *dispatcherExecutorAttachmentsClient) Recv() (*ExecutorAttachmentMessage, error) {
+	m := new(ExecutorAttachmentMessage)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func (c *dispatcherClient) CreateExecutorAttachment(ctx context.Context, in *CreateExecutorAttachmentRequest, opts ...grpc.CallOption) (*CreateExecutorAttachmentResponse, error) {
+	out := new(CreateExecutorAttachmentResponse)
+	err := grpc.Invoke(ctx, "/docker.swarmkit.v1.Dispatcher/CreateExecutorAttachment", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *dispatcherClient) RemoveExecutorAttachment(ctx context.Context, in *RemoveExecutorAttachmentRequest, opts ...grpc.CallOption) (*RemoveExecutorAttachmentResponse, error) {
+	out := new(RemoveExecutorAttachmentResponse)
+	err := grpc.Invoke(ctx, "/docker.swarmkit.v1.Dispatcher/RemoveExecutorAttachment", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // Server API for Dispatcher service
 
 type DispatcherServer interface {
@@ -653,6 +936,11 @@ type DispatcherServer interface {
 	// of tasks which should be run on node, if task is not present in that list,
 	// it should be terminated.
 	Tasks(*TasksRequest, Dispatcher_TasksServer) error
+	// ExecutorAttachments is a stream of container attachment resources
+	// allocated for the node.
+	ExecutorAttachments(*ExecutorAttachmentsRequest, Dispatcher_ExecutorAttachmentsServer) error
+	CreateExecutorAttachment(context.Context, *CreateExecutorAttachmentRequest) (*CreateExecutorAttachmentResponse, error)
+	RemoveExecutorAttachment(context.Context, *RemoveExecutorAttachmentRequest) (*RemoveExecutorAttachmentResponse, error)
 }
 
 func RegisterDispatcherServer(s *grpc.Server, srv DispatcherServer) {
@@ -737,6 +1025,63 @@ func (x *dispatcherTasksServer) Send(m *TasksMessage) error {
 	return x.ServerStream.SendMsg(m)
 }
 
+func _Dispatcher_ExecutorAttachments_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(ExecutorAttachmentsRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(DispatcherServer).ExecutorAttachments(m, &dispatcherExecutorAttachmentsServer{stream})
+}
+
+type Dispatcher_ExecutorAttachmentsServer interface {
+	Send(*ExecutorAttachmentMessage) error
+	grpc.ServerStream
+}
+
+type dispatcherExecutorAttachmentsServer struct {
+	grpc.ServerStream
+}
+
+func (x *dispatcherExecutorAttachmentsServer) Send(m *ExecutorAttachmentMessage) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func _Dispatcher_CreateExecutorAttachment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateExecutorAttachmentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DispatcherServer).CreateExecutorAttachment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/docker.swarmkit.v1.Dispatcher/CreateExecutorAttachment",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DispatcherServer).CreateExecutorAttachment(ctx, req.(*CreateExecutorAttachmentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Dispatcher_RemoveExecutorAttachment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveExecutorAttachmentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DispatcherServer).RemoveExecutorAttachment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/docker.swarmkit.v1.Dispatcher/RemoveExecutorAttachment",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DispatcherServer).RemoveExecutorAttachment(ctx, req.(*RemoveExecutorAttachmentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _Dispatcher_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "docker.swarmkit.v1.Dispatcher",
 	HandlerType: (*DispatcherServer)(nil),
@@ -749,6 +1094,14 @@ var _Dispatcher_serviceDesc = grpc.ServiceDesc{
 			MethodName: "UpdateTaskStatus",
 			Handler:    _Dispatcher_UpdateTaskStatus_Handler,
 		},
+		{
+			MethodName: "CreateExecutorAttachment",
+			Handler:    _Dispatcher_CreateExecutorAttachment_Handler,
+		},
+		{
+			MethodName: "RemoveExecutorAttachment",
+			Handler:    _Dispatcher_RemoveExecutorAttachment_Handler,
+		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
@@ -759,6 +1112,11 @@ var _Dispatcher_serviceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "Tasks",
 			Handler:       _Dispatcher_Tasks_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "ExecutorAttachments",
+			Handler:       _Dispatcher_ExecutorAttachments_Handler,
 			ServerStreams: true,
 		},
 	},
@@ -1042,6 +1400,154 @@ func (m *TasksMessage) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
+func (m *ExecutorAttachmentsRequest) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *ExecutorAttachmentsRequest) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.SessionID) > 0 {
+		data[i] = 0xa
+		i++
+		i = encodeVarintDispatcher(data, i, uint64(len(m.SessionID)))
+		i += copy(data[i:], m.SessionID)
+	}
+	return i, nil
+}
+
+func (m *ExecutorAttachmentMessage) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *ExecutorAttachmentMessage) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.Attachments) > 0 {
+		for _, msg := range m.Attachments {
+			data[i] = 0xa
+			i++
+			i = encodeVarintDispatcher(data, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(data[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	return i, nil
+}
+
+func (m *CreateExecutorAttachmentRequest) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *CreateExecutorAttachmentRequest) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Spec != nil {
+		data[i] = 0xa
+		i++
+		i = encodeVarintDispatcher(data, i, uint64(m.Spec.Size()))
+		n5, err := m.Spec.MarshalTo(data[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n5
+	}
+	return i, nil
+}
+
+func (m *CreateExecutorAttachmentResponse) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *CreateExecutorAttachmentResponse) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.ID) > 0 {
+		data[i] = 0xa
+		i++
+		i = encodeVarintDispatcher(data, i, uint64(len(m.ID)))
+		i += copy(data[i:], m.ID)
+	}
+	return i, nil
+}
+
+func (m *RemoveExecutorAttachmentRequest) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *RemoveExecutorAttachmentRequest) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.ID) > 0 {
+		data[i] = 0xa
+		i++
+		i = encodeVarintDispatcher(data, i, uint64(len(m.ID)))
+		i += copy(data[i:], m.ID)
+	}
+	return i, nil
+}
+
+func (m *RemoveExecutorAttachmentResponse) Marshal() (data []byte, err error) {
+	size := m.Size()
+	data = make([]byte, size)
+	n, err := m.MarshalTo(data)
+	if err != nil {
+		return nil, err
+	}
+	return data[:n], nil
+}
+
+func (m *RemoveExecutorAttachmentResponse) MarshalTo(data []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	return i, nil
+}
+
 func encodeFixed64Dispatcher(data []byte, offset int, v uint64) int {
 	data[offset] = uint8(v)
 	data[offset+1] = uint8(v >> 8)
@@ -1215,6 +1721,72 @@ func (p *raftProxyDispatcherServer) Tasks(r *TasksRequest, stream Dispatcher_Tas
 	return nil
 }
 
+func (p *raftProxyDispatcherServer) ExecutorAttachments(r *ExecutorAttachmentsRequest, stream Dispatcher_ExecutorAttachmentsServer) error {
+
+	if p.cluster.IsLeader() {
+		return p.local.ExecutorAttachments(r, stream)
+	}
+	ctx, err := p.runCtxMods(stream.Context())
+	if err != nil {
+		return err
+	}
+	conn, err := p.connSelector.Conn()
+	if err != nil {
+		return err
+	}
+	clientStream, err := NewDispatcherClient(conn).ExecutorAttachments(ctx, r)
+
+	if err != nil {
+		return err
+	}
+
+	for {
+		msg, err := clientStream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		if err := stream.Send(msg); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (p *raftProxyDispatcherServer) CreateExecutorAttachment(ctx context.Context, r *CreateExecutorAttachmentRequest) (*CreateExecutorAttachmentResponse, error) {
+
+	if p.cluster.IsLeader() {
+		return p.local.CreateExecutorAttachment(ctx, r)
+	}
+	ctx, err := p.runCtxMods(ctx)
+	if err != nil {
+		return nil, err
+	}
+	conn, err := p.connSelector.Conn()
+	if err != nil {
+		return nil, err
+	}
+	return NewDispatcherClient(conn).CreateExecutorAttachment(ctx, r)
+}
+
+func (p *raftProxyDispatcherServer) RemoveExecutorAttachment(ctx context.Context, r *RemoveExecutorAttachmentRequest) (*RemoveExecutorAttachmentResponse, error) {
+
+	if p.cluster.IsLeader() {
+		return p.local.RemoveExecutorAttachment(ctx, r)
+	}
+	ctx, err := p.runCtxMods(ctx)
+	if err != nil {
+		return nil, err
+	}
+	conn, err := p.connSelector.Conn()
+	if err != nil {
+		return nil, err
+	}
+	return NewDispatcherClient(conn).RemoveExecutorAttachment(ctx, r)
+}
+
 func (m *SessionRequest) Size() (n int) {
 	var l int
 	_ = l
@@ -1327,6 +1899,64 @@ func (m *TasksMessage) Size() (n int) {
 	return n
 }
 
+func (m *ExecutorAttachmentsRequest) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.SessionID)
+	if l > 0 {
+		n += 1 + l + sovDispatcher(uint64(l))
+	}
+	return n
+}
+
+func (m *ExecutorAttachmentMessage) Size() (n int) {
+	var l int
+	_ = l
+	if len(m.Attachments) > 0 {
+		for _, e := range m.Attachments {
+			l = e.Size()
+			n += 1 + l + sovDispatcher(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *CreateExecutorAttachmentRequest) Size() (n int) {
+	var l int
+	_ = l
+	if m.Spec != nil {
+		l = m.Spec.Size()
+		n += 1 + l + sovDispatcher(uint64(l))
+	}
+	return n
+}
+
+func (m *CreateExecutorAttachmentResponse) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.ID)
+	if l > 0 {
+		n += 1 + l + sovDispatcher(uint64(l))
+	}
+	return n
+}
+
+func (m *RemoveExecutorAttachmentRequest) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.ID)
+	if l > 0 {
+		n += 1 + l + sovDispatcher(uint64(l))
+	}
+	return n
+}
+
+func (m *RemoveExecutorAttachmentResponse) Size() (n int) {
+	var l int
+	_ = l
+	return n
+}
+
 func sovDispatcher(x uint64) (n int) {
 	for {
 		n++
@@ -1430,6 +2060,65 @@ func (this *TasksMessage) String() string {
 	}
 	s := strings.Join([]string{`&TasksMessage{`,
 		`Tasks:` + strings.Replace(fmt.Sprintf("%v", this.Tasks), "Task", "Task", 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ExecutorAttachmentsRequest) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ExecutorAttachmentsRequest{`,
+		`SessionID:` + fmt.Sprintf("%v", this.SessionID) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ExecutorAttachmentMessage) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ExecutorAttachmentMessage{`,
+		`Attachments:` + strings.Replace(fmt.Sprintf("%v", this.Attachments), "ExecutorAttachment", "ExecutorAttachment", 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *CreateExecutorAttachmentRequest) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&CreateExecutorAttachmentRequest{`,
+		`Spec:` + strings.Replace(fmt.Sprintf("%v", this.Spec), "ExecutorAttachmentSpec", "ExecutorAttachmentSpec", 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *CreateExecutorAttachmentResponse) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&CreateExecutorAttachmentResponse{`,
+		`ID:` + fmt.Sprintf("%v", this.ID) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *RemoveExecutorAttachmentRequest) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&RemoveExecutorAttachmentRequest{`,
+		`ID:` + fmt.Sprintf("%v", this.ID) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *RemoveExecutorAttachmentResponse) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&RemoveExecutorAttachmentResponse{`,
 		`}`,
 	}, "")
 	return s
@@ -2290,6 +2979,457 @@ func (m *TasksMessage) Unmarshal(data []byte) error {
 	}
 	return nil
 }
+func (m *ExecutorAttachmentsRequest) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowDispatcher
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ExecutorAttachmentsRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ExecutorAttachmentsRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SessionID", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowDispatcher
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthDispatcher
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SessionID = string(data[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipDispatcher(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthDispatcher
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ExecutorAttachmentMessage) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowDispatcher
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ExecutorAttachmentMessage: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ExecutorAttachmentMessage: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Attachments", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowDispatcher
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthDispatcher
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Attachments = append(m.Attachments, &ExecutorAttachment{})
+			if err := m.Attachments[len(m.Attachments)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipDispatcher(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthDispatcher
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *CreateExecutorAttachmentRequest) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowDispatcher
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: CreateExecutorAttachmentRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: CreateExecutorAttachmentRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Spec", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowDispatcher
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthDispatcher
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Spec == nil {
+				m.Spec = &ExecutorAttachmentSpec{}
+			}
+			if err := m.Spec.Unmarshal(data[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipDispatcher(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthDispatcher
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *CreateExecutorAttachmentResponse) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowDispatcher
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: CreateExecutorAttachmentResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: CreateExecutorAttachmentResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ID", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowDispatcher
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthDispatcher
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ID = string(data[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipDispatcher(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthDispatcher
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *RemoveExecutorAttachmentRequest) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowDispatcher
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: RemoveExecutorAttachmentRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: RemoveExecutorAttachmentRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ID", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowDispatcher
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthDispatcher
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ID = string(data[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipDispatcher(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthDispatcher
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *RemoveExecutorAttachmentResponse) Unmarshal(data []byte) error {
+	l := len(data)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowDispatcher
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := data[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: RemoveExecutorAttachmentResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: RemoveExecutorAttachmentResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		default:
+			iNdEx = preIndex
+			skippy, err := skipDispatcher(data[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthDispatcher
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
 func skipDispatcher(data []byte) (n int, err error) {
 	l := len(data)
 	iNdEx := 0
@@ -2396,45 +3536,56 @@ var (
 )
 
 var fileDescriptorDispatcher = []byte{
-	// 626 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x9c, 0x54, 0xdf, 0x6e, 0x12, 0x4f,
-	0x14, 0xee, 0x02, 0x85, 0x1f, 0x87, 0xf2, 0x0b, 0x8e, 0x8d, 0xdd, 0x6c, 0x2a, 0xc5, 0x45, 0x13,
-	0x13, 0xeb, 0xa2, 0x35, 0xf1, 0xc2, 0x10, 0x63, 0x08, 0x4d, 0x6c, 0x8c, 0x7f, 0xb2, 0x55, 0xb9,
-	0x24, 0x0b, 0x3b, 0xa1, 0x2b, 0x76, 0x67, 0x9d, 0x19, 0xac, 0x5c, 0x98, 0x98, 0x78, 0x6f, 0x8c,
-	0x57, 0x3e, 0x85, 0xcf, 0x41, 0xbc, 0xf2, 0xd2, 0xab, 0xc6, 0xf6, 0x01, 0x8c, 0x8f, 0xe0, 0xec,
-	0xec, 0x2c, 0x20, 0x5d, 0xb4, 0xf4, 0x62, 0xc2, 0xcc, 0x99, 0xef, 0xfb, 0xce, 0xc7, 0x39, 0x67,
-	0x16, 0x4a, 0xae, 0xc7, 0x02, 0x87, 0x77, 0xf7, 0x30, 0xb5, 0x02, 0x4a, 0x38, 0x41, 0xc8, 0x25,
-	0xdd, 0xbe, 0x38, 0xb1, 0x03, 0x87, 0xee, 0xf7, 0x3d, 0x6e, 0xbd, 0xbe, 0x69, 0x14, 0xf8, 0x30,
-	0xc0, 0x2c, 0x02, 0x18, 0x45, 0xd2, 0x79, 0x81, 0xbb, 0x3c, 0x3e, 0xae, 0xf6, 0x48, 0x8f, 0xc8,
-	0x6d, 0x2d, 0xdc, 0xa9, 0xe8, 0xf9, 0xe0, 0xe5, 0xa0, 0xe7, 0xf9, 0xb5, 0xe8, 0x47, 0x05, 0xd7,
-	0xdc, 0x01, 0x75, 0xb8, 0x47, 0xfc, 0x5a, 0xbc, 0x89, 0x2e, 0xcc, 0x16, 0xfc, 0xbf, 0x8b, 0x19,
-	0x13, 0x01, 0x1b, 0xbf, 0x1a, 0x60, 0xc6, 0xd1, 0x36, 0x14, 0x5c, 0xcc, 0xba, 0xd4, 0x0b, 0x42,
-	0x98, 0xae, 0x55, 0xb4, 0xab, 0x85, 0xad, 0xaa, 0x75, 0xd2, 0x9b, 0xf5, 0x88, 0xb8, 0xb8, 0x39,
-	0x81, 0xda, 0xd3, 0x3c, 0xf3, 0x7d, 0x6a, 0xac, 0xfc, 0x50, 0xfc, 0x38, 0x3d, 0x8c, 0x36, 0x01,
-	0x58, 0x14, 0x69, 0x7b, 0xae, 0x14, 0xce, 0x37, 0x8a, 0xc7, 0x87, 0x1b, 0x79, 0x85, 0xdb, 0x69,
-	0xda, 0x79, 0x05, 0xd8, 0x71, 0x05, 0x3a, 0xe3, 0x8b, 0x04, 0x7a, 0x4a, 0x1a, 0xd0, 0xe7, 0x19,
-	0xb0, 0x25, 0x0a, 0xd5, 0xe1, 0xbf, 0x7d, 0xc7, 0x17, 0x59, 0x28, 0xd3, 0xd3, 0x95, 0xb4, 0x60,
-	0x54, 0x92, 0x18, 0x2d, 0xec, 0xf5, 0xf6, 0x38, 0x76, 0x9f, 0x60, 0x4c, 0xed, 0x31, 0x03, 0xb5,
-	0xe0, 0x82, 0x8f, 0xf9, 0x01, 0xa1, 0xfd, 0x76, 0x87, 0x10, 0xce, 0x38, 0x75, 0x82, 0x76, 0x1f,
-	0x0f, 0x99, 0x9e, 0x91, 0x5a, 0x97, 0x92, 0xb4, 0xb6, 0xfd, 0x2e, 0x1d, 0xca, 0x3f, 0xfb, 0x00,
-	0x0f, 0xed, 0x55, 0x25, 0xd0, 0x88, 0xf9, 0x22, 0xc8, 0xcc, 0x7b, 0x50, 0xba, 0x8f, 0x1d, 0xca,
-	0x3b, 0xd8, 0xe1, 0x71, 0x81, 0x17, 0x2a, 0x83, 0xf9, 0x18, 0xce, 0x4d, 0x29, 0xb0, 0x80, 0xf8,
-	0x0c, 0xa3, 0x3b, 0x90, 0x0d, 0x30, 0xf5, 0x88, 0xab, 0xda, 0xb3, 0x9e, 0xe4, 0xaf, 0xa9, 0x3a,
-	0xdd, 0xc8, 0x8c, 0x0e, 0x37, 0x96, 0x6c, 0xc5, 0x30, 0x3f, 0xa6, 0x60, 0xed, 0x59, 0xe0, 0x3a,
-	0x1c, 0x3f, 0x75, 0x58, 0x7f, 0x97, 0x3b, 0x7c, 0xc0, 0xce, 0x64, 0x0d, 0x3d, 0x87, 0xdc, 0x40,
-	0x0a, 0xc5, 0x25, 0xaf, 0x27, 0xd9, 0x98, 0x93, 0xcb, 0x9a, 0x44, 0x22, 0x84, 0x1d, 0x8b, 0x19,
-	0x04, 0x4a, 0xb3, 0x97, 0xa8, 0x0a, 0x39, 0x2e, 0x62, 0x13, 0x5b, 0x20, 0x6c, 0x65, 0x43, 0x98,
-	0xf0, 0x94, 0x0d, 0xaf, 0x84, 0xa1, 0xdb, 0x90, 0x65, 0x92, 0xa4, 0x86, 0xa6, 0x9c, 0xe4, 0x67,
-	0xca, 0x89, 0x42, 0x9b, 0x06, 0xe8, 0x27, 0x5d, 0x46, 0xa5, 0x36, 0xeb, 0xb0, 0x12, 0x46, 0xcf,
-	0x56, 0x22, 0xf3, 0xae, 0x62, 0xc7, 0x4f, 0xc0, 0x82, 0xe5, 0xd0, 0x2b, 0x13, 0xc4, 0xf4, 0xbc,
-	0xa9, 0x0e, 0x09, 0x76, 0x04, 0xdb, 0xfa, 0x90, 0x01, 0x68, 0x8e, 0xbf, 0x13, 0xe8, 0x0d, 0xe4,
-	0x54, 0x1a, 0x64, 0x26, 0x51, 0xff, 0x7c, 0xca, 0xc6, 0xdf, 0x30, 0xca, 0x91, 0x59, 0xfd, 0xfa,
-	0xe5, 0xe7, 0xe7, 0xd4, 0x45, 0x58, 0x91, 0x98, 0xeb, 0xe1, 0x08, 0x63, 0x0a, 0xc5, 0xe8, 0xa4,
-	0x1e, 0xc8, 0x0d, 0x0d, 0xbd, 0x85, 0xfc, 0x78, 0x0c, 0xd1, 0xe5, 0x24, 0xdd, 0xd9, 0x39, 0x37,
-	0xae, 0xfc, 0x03, 0xa5, 0x0a, 0x7c, 0x1a, 0x03, 0xe8, 0x93, 0x06, 0xa5, 0xd9, 0x16, 0xa1, 0x6b,
-	0x0b, 0x8c, 0x9b, 0xb1, 0x79, 0x3a, 0xf0, 0x22, 0xa6, 0x28, 0x2c, 0xcb, 0xe6, 0xa2, 0xca, 0xbc,
-	0x36, 0x8e, 0xb3, 0xcf, 0x47, 0x2c, 0xd6, 0x87, 0xc6, 0xfa, 0xe8, 0xa8, 0xbc, 0xf4, 0x5d, 0xac,
-	0x5f, 0x47, 0x65, 0xed, 0xdd, 0x71, 0x59, 0x1b, 0x89, 0xf5, 0x4d, 0xac, 0x1f, 0x62, 0x75, 0xb2,
-	0xf2, 0xa3, 0x7e, 0xeb, 0x77, 0x00, 0x00, 0x00, 0xff, 0xff, 0x3f, 0x41, 0x8f, 0x02, 0x5c, 0x06,
+	// 802 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x9c, 0x56, 0x4f, 0x4f, 0xdb, 0x48,
+	0x14, 0xc7, 0x21, 0x04, 0xf2, 0x02, 0xab, 0xec, 0x80, 0x20, 0x6b, 0xb1, 0x49, 0xd6, 0xec, 0xae,
+	0x56, 0x5b, 0x08, 0x2d, 0x54, 0x95, 0x8a, 0x10, 0x6a, 0xd3, 0x20, 0x41, 0xab, 0xfe, 0x91, 0x69,
+	0xcb, 0x11, 0x39, 0xf6, 0x28, 0xb8, 0x69, 0x3c, 0xee, 0xcc, 0x04, 0xc8, 0xa1, 0x52, 0xa5, 0x4a,
+	0x3d, 0x57, 0x3d, 0x55, 0xea, 0x37, 0xe8, 0xa1, 0x9f, 0x03, 0xf5, 0xd4, 0x63, 0x4f, 0xa8, 0xf0,
+	0x01, 0xaa, 0x7e, 0x84, 0x8e, 0xed, 0x71, 0x92, 0x12, 0x9b, 0x24, 0x1c, 0x46, 0xf1, 0x3c, 0xff,
+	0x7e, 0xef, 0xfd, 0xfc, 0x66, 0x7e, 0x4f, 0x81, 0xac, 0x65, 0x33, 0xd7, 0xe0, 0xe6, 0x3e, 0xa6,
+	0x25, 0x97, 0x12, 0x4e, 0x10, 0xb2, 0x88, 0x59, 0x17, 0x3b, 0x76, 0x68, 0xd0, 0x46, 0xdd, 0xe6,
+	0xa5, 0x83, 0x6b, 0x6a, 0x86, 0xb9, 0xd8, 0x64, 0x01, 0x40, 0xcd, 0xf0, 0x96, 0x8b, 0xc3, 0xcd,
+	0x14, 0xa9, 0x3e, 0xc3, 0x26, 0x0f, 0xb7, 0x33, 0x35, 0x52, 0x23, 0xfe, 0xe3, 0xb2, 0xf7, 0x24,
+	0xa3, 0xd3, 0xee, 0xf3, 0x66, 0xcd, 0x76, 0x96, 0x83, 0x1f, 0x19, 0x9c, 0xb3, 0x9a, 0xd4, 0xe0,
+	0x36, 0x71, 0x96, 0xc3, 0x87, 0xe0, 0x85, 0xb6, 0x0b, 0xbf, 0xed, 0x60, 0xc6, 0x44, 0x40, 0xc7,
+	0x2f, 0x9a, 0x98, 0x71, 0xb4, 0x09, 0x19, 0x0b, 0x33, 0x93, 0xda, 0xae, 0x07, 0xcb, 0x29, 0x45,
+	0xe5, 0xbf, 0xcc, 0xca, 0x42, 0xa9, 0x57, 0x68, 0xe9, 0x01, 0xb1, 0x70, 0xa5, 0x03, 0xd5, 0xbb,
+	0x79, 0xda, 0xeb, 0x44, 0x3b, 0xf3, 0x7d, 0xf1, 0x63, 0xd4, 0x30, 0x5a, 0x04, 0x60, 0x41, 0x64,
+	0xcf, 0xb6, 0xfc, 0xc4, 0xe9, 0xf2, 0xd4, 0xd9, 0x49, 0x21, 0x2d, 0x71, 0xdb, 0x15, 0x3d, 0x2d,
+	0x01, 0xdb, 0x96, 0x40, 0x27, 0x1d, 0x51, 0x20, 0x97, 0xf0, 0x05, 0xe4, 0xe2, 0x04, 0xe8, 0x3e,
+	0x0a, 0xad, 0xc3, 0x44, 0xc3, 0x70, 0x44, 0x15, 0xca, 0x72, 0xa3, 0xc5, 0x51, 0xc1, 0x28, 0x46,
+	0x31, 0x76, 0xb1, 0x5d, 0xdb, 0xe7, 0xd8, 0x7a, 0x84, 0x31, 0xd5, 0xdb, 0x0c, 0xb4, 0x0b, 0xb3,
+	0x0e, 0xe6, 0x87, 0x84, 0xd6, 0xf7, 0xaa, 0x84, 0x70, 0xc6, 0xa9, 0xe1, 0xee, 0xd5, 0x71, 0x8b,
+	0xe5, 0x92, 0x7e, 0xae, 0xbf, 0xa2, 0x72, 0x6d, 0x3a, 0x26, 0x6d, 0xf9, 0x1f, 0x7b, 0x0f, 0xb7,
+	0xf4, 0x19, 0x99, 0xa0, 0x1c, 0xf2, 0x45, 0x90, 0x69, 0xb7, 0x20, 0xbb, 0x85, 0x0d, 0xca, 0xab,
+	0xd8, 0xe0, 0x61, 0x83, 0x87, 0x6a, 0x83, 0xf6, 0x10, 0x7e, 0xef, 0xca, 0xc0, 0x5c, 0xe2, 0x30,
+	0x8c, 0xd6, 0x20, 0xe5, 0x62, 0x6a, 0x13, 0x4b, 0x1e, 0xcf, 0x7c, 0x94, 0xbe, 0x8a, 0x3c, 0xe9,
+	0x72, 0xf2, 0xf8, 0xa4, 0x30, 0xa2, 0x4b, 0x86, 0xf6, 0x36, 0x01, 0x73, 0x4f, 0x5c, 0xcb, 0xe0,
+	0xf8, 0xb1, 0xc1, 0xea, 0x3b, 0xdc, 0xe0, 0x4d, 0x76, 0x29, 0x69, 0xe8, 0x29, 0x8c, 0x37, 0xfd,
+	0x44, 0x61, 0xcb, 0xd7, 0xa3, 0x64, 0xc4, 0xd4, 0x2a, 0x75, 0x22, 0x01, 0x42, 0x0f, 0x93, 0xa9,
+	0x04, 0xb2, 0xe7, 0x5f, 0xa2, 0x05, 0x18, 0xe7, 0x22, 0xd6, 0x91, 0x05, 0x42, 0x56, 0xca, 0x83,
+	0x09, 0x4d, 0x29, 0xef, 0x95, 0x10, 0x74, 0x03, 0x52, 0xcc, 0x27, 0xc9, 0x4b, 0x93, 0x8f, 0xd2,
+	0xd3, 0xa5, 0x44, 0xa2, 0x35, 0x15, 0x72, 0xbd, 0x2a, 0x83, 0x56, 0x6b, 0xeb, 0x30, 0xe9, 0x45,
+	0x2f, 0xd7, 0x22, 0x6d, 0x43, 0xb2, 0x43, 0x0b, 0x94, 0x60, 0xcc, 0xd3, 0xca, 0x04, 0x71, 0x34,
+	0xee, 0x56, 0x7b, 0x04, 0x3d, 0x80, 0x69, 0x77, 0x41, 0xdd, 0x3c, 0xc2, 0x66, 0x93, 0x13, 0x7a,
+	0x9b, 0x73, 0xc3, 0xdc, 0x6f, 0x60, 0x87, 0x5f, 0x52, 0x0b, 0x86, 0x3f, 0x7a, 0x73, 0x85, 0xc2,
+	0xb6, 0x20, 0x63, 0x74, 0x0a, 0x48, 0x79, 0xff, 0x46, 0x5e, 0xfb, 0x9e, 0x1c, 0x7a, 0x37, 0x55,
+	0x33, 0xa0, 0x70, 0x87, 0x8a, 0xcb, 0x8a, 0x23, 0x80, 0x52, 0xf7, 0x06, 0x24, 0xbd, 0x19, 0x27,
+	0x2f, 0xef, 0xff, 0x83, 0x55, 0xd9, 0x11, 0x0c, 0xdd, 0xe7, 0x69, 0x6b, 0x50, 0x8c, 0x2f, 0x21,
+	0x2d, 0x32, 0x0b, 0x89, 0x76, 0x4f, 0x52, 0xa2, 0x27, 0x09, 0xd1, 0x0c, 0x11, 0xd1, 0x6e, 0x42,
+	0x41, 0xc7, 0x0d, 0x72, 0x70, 0x81, 0xbc, 0x38, 0xaa, 0x06, 0xc5, 0x78, 0x6a, 0x50, 0x76, 0xe5,
+	0xcd, 0x04, 0x40, 0xa5, 0x3d, 0xe5, 0xd1, 0x11, 0x8c, 0xcb, 0xb3, 0x40, 0x5a, 0xd4, 0x67, 0xfe,
+	0x3a, 0x7b, 0xd5, 0x8b, 0x30, 0xf2, 0xa4, 0xb4, 0x85, 0xcf, 0x9f, 0xbe, 0xbf, 0x4f, 0xfc, 0x09,
+	0x93, 0x3e, 0x66, 0xc9, 0x9b, 0x39, 0x98, 0xc2, 0x54, 0xb0, 0x93, 0x13, 0xed, 0xaa, 0x82, 0x5e,
+	0x42, 0xba, 0x3d, 0x37, 0xd0, 0xdf, 0x51, 0x79, 0xcf, 0x0f, 0x26, 0xf5, 0x9f, 0x3e, 0x28, 0xe9,
+	0x88, 0x41, 0x04, 0xa0, 0x77, 0x0a, 0x64, 0xcf, 0x7b, 0x0a, 0x5d, 0x19, 0x62, 0x3e, 0xa8, 0x8b,
+	0x83, 0x81, 0x87, 0x11, 0x45, 0x61, 0xcc, 0x77, 0x23, 0x2a, 0xc6, 0xf9, 0xae, 0x5d, 0x3d, 0x1e,
+	0x31, 0xe4, 0x39, 0x7c, 0x50, 0x60, 0x3a, 0xc2, 0xc2, 0xa8, 0x34, 0xd8, 0xad, 0x6f, 0x0b, 0x5a,
+	0x1a, 0x0c, 0x3f, 0xa4, 0xba, 0x8f, 0x0a, 0xe4, 0xe2, 0xac, 0x84, 0x56, 0xa3, 0x4a, 0xf6, 0xf1,
+	0xb6, 0x7a, 0x7d, 0x38, 0xd2, 0x30, 0xc7, 0xe7, 0x89, 0x8d, 0x33, 0x60, 0xb4, 0xd8, 0x3e, 0x4e,
+	0x8f, 0x16, 0xdb, 0xcf, 0xe3, 0x03, 0x89, 0x2d, 0xcf, 0x1f, 0x9f, 0xe6, 0x47, 0xbe, 0x8a, 0xf5,
+	0xe3, 0x34, 0xaf, 0xbc, 0x3a, 0xcb, 0x2b, 0xc7, 0x62, 0x7d, 0x11, 0xeb, 0x9b, 0x58, 0xd5, 0x94,
+	0xff, 0xef, 0x6b, 0xf5, 0x67, 0x00, 0x00, 0x00, 0xff, 0xff, 0x87, 0x64, 0x54, 0xc8, 0x12, 0x0a,
 	0x00, 0x00,
 }

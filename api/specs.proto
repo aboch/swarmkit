@@ -255,3 +255,18 @@ message ClusterSpec {
 	// Existing tasks will continue to use the previous default until rescheduled.
 	Driver default_log_driver = 7;
 }
+
+// ExecutorAttachmentSpec specifies the allocation information
+// for the executor attachment.
+message ExecutorAttachmentSpec {
+	Annotations annotations = 1 [(gogoproto.nullable) = false];
+
+	// NodeID specifies the node on which the attachment is to be placed
+	string node_id = 2 [(gogoproto.customname) = "NodeID"];
+
+	// Target specifies the network to attach to.
+	string target = 3;
+
+	// Addresses are the IPv4/IPv6 addresses specified for this attachment.
+	repeated string addresses = 4;
+}
