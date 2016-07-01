@@ -30,6 +30,7 @@ type Agent struct {
 
 	sessionq chan sessionOperation
 	worker   Worker
+	notifier *notifier
 
 	started chan struct{}
 	ready   chan struct{}
@@ -47,6 +48,7 @@ func New(config *Config) (*Agent, error) {
 	a := &Agent{
 		config:   config,
 		worker:   newWorker(config.DB, config.Executor),
+		notifier: newNotifier(),
 		sessionq: make(chan sessionOperation),
 		started:  make(chan struct{}),
 		stopped:  make(chan struct{}),
@@ -166,6 +168,8 @@ func (a *Agent) run(ctx context.Context) {
 			if err := a.worker.Assign(ctx, msg.Tasks); err != nil {
 				log.G(ctx).WithError(err).Error("task assignment failed")
 			}
+		case msg := <-session.attachmnts:
+			a.notifier.Notify(ctx, msg.Attachments)
 		case msg := <-session.messages:
 			if err := a.handleSessionMessage(ctx, msg); err != nil {
 				log.G(ctx).WithError(err).Error("session message handler failed")

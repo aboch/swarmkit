@@ -54,6 +54,8 @@ var (
 	ErrSessionInvalid = errors.New("session invalid")
 	// ErrNodeNotFound returned when the Node doesn't exists in raft.
 	ErrNodeNotFound = errors.New("node not found")
+	// ErrInvalidArgument returned when the request contains invalid arguments.
+	ErrInvalidArgument = errors.New("invalid argument")
 )
 
 // Config is configuration for Dispatcher. For default you should use
@@ -765,4 +767,92 @@ func (d *Dispatcher) Session(r *api.SessionRequest, stream api.Dispatcher_Sessio
 // NodeCount returns number of nodes which connected to this dispatcher.
 func (d *Dispatcher) NodeCount() int {
 	return d.nodes.Len()
+}
+
+// ExecutorAttachments is a stream of container attachment resources
+// allocated for the node.
+func (d *Dispatcher) ExecutorAttachments(r *api.ExecutorAttachmentsRequest, stream api.Dispatcher_ExecutorAttachmentsServer) error {
+	fmt.Printf("\nRegistering for attachments\n")
+	nodeInfo, err := ca.RemoteNode(stream.Context())
+	if err != nil {
+		return err
+	}
+	nodeID := nodeInfo.NodeID
+
+	if err := d.isRunningLocked(); err != nil {
+		return err
+	}
+
+	fields := logrus.Fields{
+		"node.id":      nodeID,
+		"node.session": r.SessionID,
+		"method":       "(*Dispatcher).ontainerAttachments",
+	}
+	if nodeInfo.ForwardedBy != nil {
+		fields["forwarder.id"] = nodeInfo.ForwardedBy.NodeID
+	}
+	log.G(stream.Context()).WithFields(fields).Debugf("")
+
+	if _, err = d.nodes.GetWithSession(nodeID, r.SessionID); err != nil {
+		return err
+	}
+
+	attachmentMap := make(map[string]*api.ExecutorAttachment)
+	nodeAttachments, cancel, err := store.ViewAndWatch(
+		d.store,
+		func(readTx store.ReadTx) error {
+			attachments, err := store.FindAttachments(readTx, store.ByNodeID(nodeID))
+			if err != nil {
+				return err
+			}
+			for _, a := range attachments {
+				attachmentMap[a.ID] = a
+			}
+			return nil
+		},
+		state.EventCreateAttachment{Attachment: &api.ExecutorAttachment{NodeID: nodeID},
+			Checks: []state.AttachmentCheckFunc{state.AttachmentCheckNodeID}},
+		state.EventUpdateAttachment{Attachment: &api.ExecutorAttachment{NodeID: nodeID},
+			Checks: []state.AttachmentCheckFunc{state.AttachmentCheckNodeID}},
+		state.EventDeleteAttachment{Attachment: &api.ExecutorAttachment{NodeID: nodeID},
+			Checks: []state.AttachmentCheckFunc{state.AttachmentCheckNodeID}},
+	)
+	if err != nil {
+		return err
+	}
+	defer cancel()
+
+	for {
+		if _, err := d.nodes.GetWithSession(nodeID, r.SessionID); err != nil {
+			return err
+		}
+
+		var attachments []*api.ExecutorAttachment
+		for _, a := range attachmentMap {
+			// dispatcher only sends attachments that have been allocated
+			if a.Status.State == api.TaskStateAllocated {
+				attachments = append(attachments, a)
+			}
+		}
+
+		if err := stream.Send(&api.ExecutorAttachmentMessage{Attachments: attachments}); err != nil {
+			return err
+		}
+
+		select {
+		case event := <-nodeAttachments:
+			switch v := event.(type) {
+			case state.EventCreateAttachment:
+				attachmentMap[v.Attachment.ID] = v.Attachment
+			case state.EventUpdateAttachment:
+				attachmentMap[v.Attachment.ID] = v.Attachment
+			case state.EventDeleteAttachment:
+				delete(attachmentMap, v.Attachment.ID)
+			}
+		case <-stream.Context().Done():
+			return stream.Context().Err()
+		case <-d.ctx.Done():
+			return d.ctx.Err()
+		}
+	}
 }

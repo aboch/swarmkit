@@ -333,6 +333,8 @@ func (a *Allocator) doNetworkAlloc(ctx context.Context, ev events.Event) {
 		if err := nc.nwkAllocator.ServiceDeallocate(s); err != nil {
 			log.G(ctx).Errorf("Failed deallocation during delete of service %s: %v", s.ID, err)
 		}
+	case state.EventCreateAttachment, state.EventDeleteAttachment:
+		a.doAttachmentAlloc(ctx, nc, ev)
 	case state.EventCreateNode, state.EventUpdateNode, state.EventDeleteNode:
 		a.doNodeAlloc(ctx, nc, ev)
 	case state.EventCreateTask, state.EventUpdateTask, state.EventDeleteTask:
@@ -826,4 +828,48 @@ func updateTaskStatus(t *api.Task, newStatus api.TaskState, message string) {
 	t.Status.State = newStatus
 	t.Status.Message = message
 	t.Status.Timestamp = ptypes.MustTimestampProto(time.Now())
+}
+
+func updateAttachmentStatus(t *api.ExecutorAttachment, newStatus api.TaskState, message string) {
+	t.Status.State = newStatus
+	t.Status.Message = message
+	t.Status.Timestamp = ptypes.MustTimestampProto(time.Now())
+}
+
+func (a *Allocator) doAttachmentAlloc(ctx context.Context, nc *networkContext, ev events.Event) {
+	var (
+		ea     *api.ExecutorAttachment
+		update bool
+	)
+
+	switch v := ev.(type) {
+	case state.EventCreateAttachment:
+		ea = v.Attachment
+		update = true
+		if err := nc.nwkAllocator.AllocateAttachment(ea); err != nil {
+			log.G(ctx).Errorf("Failed allocating resources for attachment %s: %v", ea.ID, err)
+			updateAttachmentStatus(ea, api.TaskStateFailed, err.Error())
+			break
+		}
+		updateAttachmentStatus(ea, api.TaskStateAllocated, "allocated")
+	case state.EventDeleteAttachment:
+		ea = v.Attachment
+		update = true
+		if err := nc.nwkAllocator.DeallocateAttachment(ea); err != nil {
+			log.G(ctx).Errorf("Failed freeing resources for attachment %s: %v", ea.ID, err)
+			updateAttachmentStatus(ea, api.TaskStateFailed, err.Error())
+			break
+		}
+		updateAttachmentStatus(ea, api.TaskStateShutdown, "released")
+	}
+
+	log.G(ctx).Infof("allocator.doAttachmentAlloc(), Object: %v", ea)
+
+	if update {
+		if err := a.store.Update(func(tx store.Tx) error {
+			return store.UpdateAttachment(tx, ea)
+		}); err != nil {
+			log.G(ctx).Errorf("failed updating state in store transaction for executor attachment %s: %v", ea.ID, err)
+		}
+	}
 }

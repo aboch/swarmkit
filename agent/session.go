@@ -25,12 +25,13 @@ var (
 // flow into the agent, such as task assignment, are called back into the
 // agent through errs, messages and tasks.
 type session struct {
-	agent     *Agent
-	sessionID string
-	session   api.Dispatcher_SessionClient
-	errs      chan error
-	messages  chan *api.SessionMessage
-	tasks     chan *api.TasksMessage
+	agent      *Agent
+	sessionID  string
+	session    api.Dispatcher_SessionClient
+	errs       chan error
+	messages   chan *api.SessionMessage
+	tasks      chan *api.TasksMessage
+	attachmnts chan *api.ExecutorAttachmentMessage
 
 	registered chan struct{} // closed registration
 	closed     chan struct{}
@@ -42,6 +43,7 @@ func newSession(ctx context.Context, agent *Agent, delay time.Duration) *session
 		errs:       make(chan error),
 		messages:   make(chan *api.SessionMessage),
 		tasks:      make(chan *api.TasksMessage),
+		attachmnts: make(chan *api.ExecutorAttachmentMessage),
 		registered: make(chan struct{}),
 		closed:     make(chan struct{}),
 	}
@@ -66,6 +68,7 @@ func (s *session) run(ctx context.Context, delay time.Duration) {
 
 	go runctx(ctx, s.closed, s.errs, s.heartbeat)
 	go runctx(ctx, s.closed, s.errs, s.watch)
+	go runctx(ctx, s.closed, s.errs, s.watchAttachments)
 	go runctx(ctx, s.closed, s.errs, s.listen)
 
 	close(s.registered)
@@ -183,6 +186,32 @@ func (s *session) watch(ctx context.Context) error {
 
 		select {
 		case s.tasks <- resp:
+		case <-s.closed:
+			return errSessionClosed
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+}
+
+func (s *session) watchAttachments(ctx context.Context) error {
+	log.G(ctx).Debugf("(*session).watchAttachments")
+	client := api.NewDispatcherClient(s.agent.config.Conn)
+	watch, err := client.ExecutorAttachments(ctx,
+		&api.ExecutorAttachmentsRequest{
+			SessionID: s.sessionID})
+	if err != nil {
+		return err
+	}
+
+	for {
+		resp, err := watch.Recv()
+		if err != nil {
+			return err
+		}
+
+		select {
+		case s.attachmnts <- resp:
 		case <-s.closed:
 			return errSessionClosed
 		case <-ctx.Done():

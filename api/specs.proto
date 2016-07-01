@@ -244,3 +244,18 @@ message ClusterSpec {
 	// CAConfig defines cluster-level certificate authority settings.
 	CAConfig ca_config = 6 [(gogoproto.nullable) = false, (gogoproto.customname) = "CAConfig"];
 }
+
+// ExecutorAttachmentSpec specifies the allocation information
+// for the executor attachment.
+message ExecutorAttachmentSpec {
+	Annotations annotations = 1 [(gogoproto.nullable) = false];
+
+	// NodeID specifies the node on which the attachment is to be placed
+	string node_id = 2 [(gogoproto.customname) = "NodeID"];
+
+	// Target specifies the network to attach to.
+	string target = 3;
+
+	// Addresses are the IPv4/IPv6 addresses specified for this attachment.
+	repeated string addresses = 4;
+}

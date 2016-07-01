@@ -314,6 +314,15 @@ message TaskStatus {
 	}
 }
 
+message AttachmentStatus {
+	Timestamp timestamp = 1;
+
+	// Need to reuse TaskState enum
+	TaskState state = 2;
+
+	string message = 3;
+}
+
 // IPAMConfig specifies parameters for IP Address Management.
 message IPAMConfig {
 	// TODO(stevvooe): It may make more sense to manage IPAM and network
