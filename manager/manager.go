@@ -19,6 +19,7 @@ import (
 	"github.com/docker/swarmkit/api"
 	"github.com/docker/swarmkit/ca"
 	"github.com/docker/swarmkit/connectionbroker"
+	"github.com/docker/swarmkit/identity"
 	"github.com/docker/swarmkit/log"
 	"github.com/docker/swarmkit/manager/allocator"
 	"github.com/docker/swarmkit/manager/controlapi"
@@ -892,7 +893,17 @@ func (m *Manager) becomeLeader(ctx context.Context) {
 			rootCA))
 		// Add Node entry for ourself, if one
 		// doesn't exist already.
-		store.CreateNode(tx, managerNode(nodeID, m.config.Availability))
+		freshCluster := nil == store.CreateNode(tx, managerNode(nodeID, m.config.Availability))
+
+		if freshCluster {
+			// This is a fresh swarm cluster. Add to store now any initial
+			// cluster resource, like the default ingress network which
+			// provides the routing mesh for this cluster.
+			if err := store.CreateNetwork(tx, newIngressNetwork()); err != nil {
+				log.G(ctx).WithError(err).Error("failed to create ingress network")
+			}
+		}
+
 		return nil
 	})
 
@@ -1081,6 +1092,33 @@ func managerNode(nodeID string, availability api.NodeSpec_Availability) *api.Nod
 			DesiredRole:  api.NodeRoleManager,
 			Membership:   api.NodeMembershipAccepted,
 			Availability: availability,
+		},
+	}
+}
+
+// newIngressNetwork returns the network object for the default ingress
+// network, the network which provides the routing mesh. Caller will save to
+// store this object once, at fresh cluster creation. It is expected to
+// call this function inside a store update transaction.
+func newIngressNetwork() *api.Network {
+	ingressNetworkName := "ingress"
+	ingressSubnet := "10.255.0.0/16"
+	return &api.Network{
+		ID: identity.NewID(),
+		Spec: api.NetworkSpec{
+			Ingress: true,
+			Annotations: api.Annotations{
+				Name: ingressNetworkName,
+			},
+			DriverConfig: &api.Driver{},
+			IPAM: &api.IPAMOptions{
+				Driver: &api.Driver{},
+				Configs: []*api.IPAMConfig{
+					{
+						Subnet: ingressSubnet,
+					},
+				},
+			},
 		},
 	}
 }

@@ -1,7 +1,6 @@
 package controlapi
 
 import (
-	"fmt"
 	"net"
 
 	"github.com/docker/docker/pkg/plugingetter"
@@ -9,6 +8,7 @@ import (
 	"github.com/docker/libnetwork/ipamapi"
 	"github.com/docker/swarmkit/api"
 	"github.com/docker/swarmkit/identity"
+	"github.com/docker/swarmkit/manager/allocator"
 	"github.com/docker/swarmkit/manager/state/store"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -75,6 +75,10 @@ func validateNetworkSpec(spec *api.NetworkSpec, pg plugingetter.PluginGetter) er
 		return grpc.Errorf(codes.InvalidArgument, errInvalidArgument.Error())
 	}
 
+	if spec.Attachable && spec.Ingress {
+		return grpc.Errorf(codes.InvalidArgument, "ingress network cannot be attachable")
+	}
+
 	if err := validateAnnotations(spec.Annotations); err != nil {
 		return err
 	}
@@ -90,18 +94,43 @@ func validateNetworkSpec(spec *api.NetworkSpec, pg plugingetter.PluginGetter) er
 	return nil
 }
 
+func isIngressNetwork(n *api.Network) bool {
+	if n.Spec.Ingress {
+		return true
+	}
+	// Check if legacy defined ingress network
+	_, ok := n.Spec.Annotations.Labels["com.docker.swarm.internal"]
+	return ok && n.Spec.Annotations.Name == "ingress"
+}
+
+func (s *Server) validateNetworkRequest(spec *api.NetworkSpec, pg plugingetter.PluginGetter) error {
+	if err := validateNetworkSpec(spec, pg); err != nil {
+		return err
+	}
+
+	// We can only accept one Ingress network
+	if spec.Ingress {
+		if spec.DriverConfig.Name != "overlay" {
+			return grpc.Errorf(codes.Unimplemented, "only overlay driver is currently supported for ingress network")
+		}
+		n, err := allocator.GetIngressNetwork(s.store)
+		if err == nil {
+			return grpc.Errorf(codes.PermissionDenied, "ingress network (%s) is already present", n.ID)
+		}
+		if err != nil && grpc.Code(err) != codes.NotFound {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // CreateNetwork creates and returns a Network based on the provided NetworkSpec.
 // - Returns `InvalidArgument` if the NetworkSpec is malformed.
 // - Returns an error if the creation fails.
 func (s *Server) CreateNetwork(ctx context.Context, request *api.CreateNetworkRequest) (*api.CreateNetworkResponse, error) {
-	// if you change this function, you have to change createInternalNetwork in
-	// the tests to match it (except the part where we check the label).
-	if err := validateNetworkSpec(request.Spec, s.pg); err != nil {
+	if err := s.validateNetworkRequest(request.Spec, s.pg); err != nil {
 		return nil, err
-	}
-
-	if _, ok := request.Spec.Annotations.Labels["com.docker.swarm.internal"]; ok {
-		return nil, grpc.Errorf(codes.PermissionDenied, "label com.docker.swarm.internal is for predefined internal networks and cannot be applied by users")
 	}
 
 	// TODO(mrjana): Consider using `Name` as a primary key to handle
@@ -152,44 +181,70 @@ func (s *Server) RemoveNetwork(ctx context.Context, request *api.RemoveNetworkRe
 		return nil, grpc.Errorf(codes.InvalidArgument, errInvalidArgument.Error())
 	}
 
-	err := s.store.Update(func(tx store.Tx) error {
-		services, err := store.FindServices(tx, store.ByReferencedNetworkID(request.NetworkID))
-		if err != nil {
-			return grpc.Errorf(codes.Internal, "could not find services using network %s: %v", request.NetworkID, err)
-		}
+	var (
+		n  *api.Network
+		rm = s.removeNetwork
+	)
 
-		if len(services) != 0 {
-			return grpc.Errorf(codes.FailedPrecondition, "network %s is in use by service %s", request.NetworkID, services[0].ID)
-		}
-
-		tasks, err := store.FindTasks(tx, store.ByReferencedNetworkID(request.NetworkID))
-		if err != nil {
-			return grpc.Errorf(codes.Internal, "could not find tasks using network %s: %v", request.NetworkID, err)
-		}
-
-		for _, t := range tasks {
-			if t.DesiredState <= api.TaskStateRunning && t.Status.State <= api.TaskStateRunning {
-				return grpc.Errorf(codes.FailedPrecondition, "network %s is in use by task %s", request.NetworkID, t.ID)
-			}
-		}
-
-		nw := store.GetNetwork(tx, request.NetworkID)
-		if _, ok := nw.Spec.Annotations.Labels["com.docker.swarm.internal"]; ok {
-			networkDescription := nw.ID
-			if nw.Spec.Annotations.Name != "" {
-				networkDescription = fmt.Sprintf("%s (%s)", nw.Spec.Annotations.Name, nw.ID)
-			}
-			return grpc.Errorf(codes.PermissionDenied, "%s is a pre-defined network and cannot be removed", networkDescription)
-		}
-		return store.DeleteNetwork(tx, request.NetworkID)
+	s.store.View(func(tx store.ReadTx) {
+		n = store.GetNetwork(tx, request.NetworkID)
 	})
-	if err != nil {
+	if n == nil {
+		return nil, grpc.Errorf(codes.NotFound, "network %s not found", request.NetworkID)
+	}
+
+	if isIngressNetwork(n) {
+		rm = s.removeIngressNetwork
+	}
+
+	if err := rm(n.ID); err != nil {
 		if err == store.ErrNotExist {
 			return nil, grpc.Errorf(codes.NotFound, "network %s not found", request.NetworkID)
 		}
 		return nil, err
 	}
 	return &api.RemoveNetworkResponse{}, nil
+}
+
+func (s *Server) removeNetwork(id string) error {
+	return s.store.Update(func(tx store.Tx) error {
+		services, err := store.FindServices(tx, store.ByReferencedNetworkID(id))
+		if err != nil {
+			return grpc.Errorf(codes.Internal, "could not find services using network %s: %v", id, err)
+		}
+
+		if len(services) != 0 {
+			return grpc.Errorf(codes.FailedPrecondition, "network %s is in use by service %s", id, services[0].ID)
+		}
+
+		tasks, err := store.FindTasks(tx, store.ByReferencedNetworkID(id))
+		if err != nil {
+			return grpc.Errorf(codes.Internal, "could not find tasks using network %s: %v", id, err)
+		}
+
+		for _, t := range tasks {
+			if t.DesiredState <= api.TaskStateRunning && t.Status.State <= api.TaskStateRunning {
+				return grpc.Errorf(codes.FailedPrecondition, "network %s is in use by task %s", id, t.ID)
+			}
+		}
+
+		return store.DeleteNetwork(tx, id)
+	})
+}
+
+func (s *Server) removeIngressNetwork(id string) error {
+	return s.store.Update(func(tx store.Tx) error {
+		services, err := store.FindServices(tx, store.All)
+		if err != nil {
+			return grpc.Errorf(codes.Internal, "could not find services using network %s: %v", id, err)
+		}
+		for _, srv := range services {
+			if doesServiceNeedIngress(srv) {
+				return grpc.Errorf(codes.PermissionDenied, "ingress network cannot be removed because service %s depends on it", srv.ID)
+			}
+		}
+		return store.DeleteNetwork(tx, id)
+	})
 }
 
 func filterNetworks(candidates []*api.Network, filters ...func(*api.Network) bool) []*api.Network {

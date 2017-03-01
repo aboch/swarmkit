@@ -249,6 +249,14 @@ message Cluster {
 	// If the key is empty, the node will be unlocked (will not require a key
 	// to start up from a shut down state).
 	repeated EncryptionKey unlock_keys = 9;
+	
+	// RoutingMeshDisabled indicates whether the routing mesh is currently
+	// disabled. By default the routing mesh is enabled. As result of user
+	// removing the ingress network, this flag will be set to true. Cluster
+	// needs to carry this information, so that on reboot or on leader re-
+	// election, new leader will not automatically create the routing mesh if
+	// it cannot find one in store.
+	bool routing_mesh_disabled = 10;
 }
 
 // Secret represents a secret that should be passed to a container or a node,
