@@ -591,7 +591,7 @@ func (a *Allocator) taskCreateNetworkAttachments(t *api.Task, s *api.Service) {
 	}
 
 	var networks []*api.NetworkAttachment
-	if IsIngressNetworkNeeded(s) {
+	if IsIngressNetworkNeeded(s) && a.netCtx.ingressNetwork != nil {
 		networks = append(networks, &api.NetworkAttachment{Network: a.netCtx.ingressNetwork})
 	}
 
@@ -804,7 +804,7 @@ func (a *Allocator) allocateService(ctx context.Context, s *api.Service) error {
 	// If the service doesn't expose ports any more and if we have
 	// any lingering virtual IP references for ingress network
 	// clean them up here.
-	if !IsIngressNetworkNeeded(s) {
+	if !IsIngressNetworkNeeded(s) && nc.ingressNetwork != nil {
 		if s.Endpoint != nil {
 			for i, vip := range s.Endpoint.VirtualIPs {
 				if vip.NetworkID == nc.ingressNetwork.ID {
