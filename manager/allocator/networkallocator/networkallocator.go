@@ -23,6 +23,12 @@ const (
 	DefaultDriver = "overlay"
 )
 
+var (
+	// BuiltinNetworkDrivers contains the list of network drivers
+	// known to the network allocator.
+	BuiltinNetworkDrivers = []string{"overlay", "macvlan"}
+)
+
 // NetworkAllocator acts as the controller for all network related operations
 // like managing network and IPAM drivers and also creating and
 // deleting networks and the associated resources.
@@ -62,6 +68,10 @@ type network struct {
 	// endpoints is a map of endpoint IP to the poolID from which it
 	// was allocated.
 	endpoints map[string]string
+
+	// hasLocalDataScope if true, it indicates the network resources
+	// will be allocated by the nodes.
+	hasLocalDataScope bool
 }
 
 type initializer struct {
@@ -110,21 +120,30 @@ func (na *NetworkAllocator) Allocate(n *api.Network) error {
 		return fmt.Errorf("network %s already allocated", n.ID)
 	}
 
-	pools, err := na.allocatePools(n)
+	_, caps, _, err := na.resolveDriver(n)
 	if err != nil {
-		return errors.Wrapf(err, "failed allocating pools and gateway IP for network %s", n.ID)
+		return err
 	}
 
-	if err := na.allocateDriverState(n); err != nil {
-		na.freePools(n, pools)
-		return errors.Wrapf(err, "failed while allocating driver state for network %s", n.ID)
+	nw := &network{
+		nw:                n,
+		endpoints:         make(map[string]string),
+		hasLocalDataScope: caps.DataScope == datastore.LocalScope,
 	}
 
-	na.networks[n.ID] = &network{
-		nw:        n,
-		pools:     pools,
-		endpoints: make(map[string]string),
+	if !nw.hasLocalDataScope {
+		nw.pools, err = na.allocatePools(n)
+		if err != nil {
+			return errors.Wrapf(err, "failed allocating pools and gateway IP for network %s", n.ID)
+		}
+
+		if err := na.allocateDriverState(n); err != nil {
+			na.freePools(n, nw.pools)
+			return errors.Wrapf(err, "failed while allocating driver state for network %s", n.ID)
+		}
 	}
+
+	na.networks[n.ID] = nw
 
 	return nil
 }
@@ -282,24 +301,32 @@ func (na *NetworkAllocator) IsTaskAllocated(t *api.Task) bool {
 	}
 
 	// To determine whether the task has its resources allocated,
-	// we just need to look at one network(in case of
+	// we just need to look at one global scope network(in case of
 	// multi-network attachment).  This is because we make sure we
 	// allocate for every network or we allocate for none.
 
-	// If the network is not allocated, the task cannot be allocated.
-	localNet, ok := na.networks[t.Networks[0].Network.ID]
-	if !ok {
-		return false
-	}
+	// Find the first global scope network
+	for _, nAttach := range t.Networks {
+		// If the network is not allocated, the task cannot be allocated.
+		localNet, ok := na.networks[nAttach.Network.ID]
+		if !ok {
+			return false
+		}
 
-	// Addresses empty. Task is not allocated.
-	if len(t.Networks[0].Addresses) == 0 {
-		return false
-	}
+		// Nothing else to check for local scope network
+		if localNet.hasLocalDataScope {
+			continue
+		}
 
-	// The allocated IP address not found in local endpoint state. Not allocated.
-	if _, ok := localNet.endpoints[t.Networks[0].Addresses[0]]; !ok {
-		return false
+		// Addresses empty. Task is not allocated.
+		if len(nAttach.Addresses) == 0 {
+			return false
+		}
+
+		// The allocated IP address not found in local endpoint state. Not allocated.
+		if _, ok := localNet.endpoints[nAttach.Addresses[0]]; !ok {
+			return false
+		}
 	}
 
 	return true
@@ -467,14 +494,18 @@ func (na *NetworkAllocator) DeallocateTask(t *api.Task) error {
 
 func (na *NetworkAllocator) releaseEndpoints(networks []*api.NetworkAttachment) error {
 	for _, nAttach := range networks {
-		ipam, _, _, err := na.resolveIPAM(nAttach.Network)
-		if err != nil {
-			return errors.Wrapf(err, "failed to resolve IPAM while allocating")
-		}
-
 		localNet := na.getNetwork(nAttach.Network.ID)
 		if localNet == nil {
 			return fmt.Errorf("could not find network allocator state for network %s", nAttach.Network.ID)
+		}
+
+		if localNet.hasLocalDataScope {
+			continue
+		}
+
+		ipam, _, _, err := na.resolveIPAM(nAttach.Network)
+		if err != nil {
+			return errors.Wrapf(err, "failed to resolve IPAM while releasing")
 		}
 
 		// Do not fail and bail out if we fail to release IP
@@ -510,6 +541,10 @@ func (na *NetworkAllocator) allocateVIP(vip *api.Endpoint_VirtualIP) error {
 	localNet := na.getNetwork(vip.NetworkID)
 	if localNet == nil {
 		return errors.New("networkallocator: could not find local network state")
+	}
+
+	if localNet.hasLocalDataScope {
+		return nil
 	}
 
 	// If this IP is already allocated in memory we don't need to
@@ -556,7 +591,9 @@ func (na *NetworkAllocator) deallocateVIP(vip *api.Endpoint_VirtualIP) error {
 	if localNet == nil {
 		return errors.New("networkallocator: could not find local network state")
 	}
-
+	if localNet.hasLocalDataScope {
+		return nil
+	}
 	ipam, _, _, err := na.resolveIPAM(localNet.nw)
 	if err != nil {
 		return errors.Wrap(err, "failed to resolve IPAM while allocating")
@@ -637,7 +674,7 @@ func (na *NetworkAllocator) allocateNetworkIPs(nAttach *api.NetworkAttachment) e
 }
 
 func (na *NetworkAllocator) freeDriverState(n *api.Network) error {
-	d, _, err := na.resolveDriver(n)
+	d, _, _, err := na.resolveDriver(n)
 	if err != nil {
 		return err
 	}
@@ -646,7 +683,7 @@ func (na *NetworkAllocator) freeDriverState(n *api.Network) error {
 }
 
 func (na *NetworkAllocator) allocateDriverState(n *api.Network) error {
-	d, dName, err := na.resolveDriver(n)
+	d, _, dName, err := na.resolveDriver(n)
 	if err != nil {
 		return err
 	}
@@ -706,7 +743,7 @@ func (na *NetworkAllocator) allocateDriverState(n *api.Network) error {
 }
 
 // Resolve network driver
-func (na *NetworkAllocator) resolveDriver(n *api.Network) (driverapi.Driver, string, error) {
+func (na *NetworkAllocator) resolveDriver(n *api.Network) (driverapi.Driver, *driverapi.Capability, string, error) {
 	dName := DefaultDriver
 	if n.Spec.DriverConfig != nil && n.Spec.DriverConfig.Name != "" {
 		dName = n.Spec.DriverConfig.Name
@@ -717,21 +754,17 @@ func (na *NetworkAllocator) resolveDriver(n *api.Network) (driverapi.Driver, str
 		var err error
 		err = na.loadDriver(dName)
 		if err != nil {
-			return nil, "", err
+			return nil, nil, "", err
 		}
 
 		d, drvcap = na.drvRegistry.Driver(dName)
 		if d == nil {
-			return nil, "", fmt.Errorf("could not resolve network driver %s", dName)
+			return nil, nil, "", fmt.Errorf("could not resolve network driver %s", dName)
 		}
 
 	}
 
-	if drvcap.DataScope != datastore.GlobalScope {
-		return nil, "", fmt.Errorf("swarm can allocate network resources only for global scoped networks. network driver (%s) is scoped %s", dName, drvcap.DataScope)
-	}
-
-	return d, dName, nil
+	return d, drvcap, dName, nil
 }
 
 func (na *NetworkAllocator) loadDriver(name string) error {
