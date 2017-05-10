@@ -11,3 +11,8 @@ func getInitializers() []initializer {
 		{ovmanager.Init, "overlay"},
 	}
 }
+
+// GetPredefinedNetworks returns the list of predefined network structures
+func GetPredefinedNetworks() []PredefinedNetwork {
+	return nil
+}

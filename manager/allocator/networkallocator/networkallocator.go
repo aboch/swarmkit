@@ -22,6 +22,13 @@ const (
 	// default if a network without any driver name specified is
 	// created.
 	DefaultDriver = "overlay"
+	// PredefinedNetworkLabel is the swarmkit label attached to a network object
+	// representing one of the predefined networks known to be statically
+	// created on the cluster nodes. These objects are populated in the store
+	// at cluster creation solely in order to support running services on the
+	// nodes' predefined networks. As a consequence, these networks need not
+	// to be exposed via public APIs.
+	PredefinedNetworkLabel = "com.docker.swarm.predefinedNetwork"
 )
 
 // NetworkAllocator acts as the controller for all network related operations
@@ -74,6 +81,13 @@ type network struct {
 type initializer struct {
 	fn    drvregistry.InitFunc
 	ntype string
+}
+
+// PredefinedNetwork contains the minimum set of data needed
+// to create the correspondent network object in the store.
+type PredefinedNetwork struct {
+	Name   string
+	Driver string
 }
 
 // New returns a new NetworkAllocator handle
