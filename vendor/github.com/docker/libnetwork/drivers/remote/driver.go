@@ -64,7 +64,7 @@ func (d *driver) getCapabilities() (*driverapi.Capability, error) {
 		return nil, err
 	}
 
-	c := &driverapi.Capability{}
+	c := &driverapi.Capability{Multihost: capResp.Multihost}
 	switch capResp.Scope {
 	case "global":
 		c.DataScope = datastore.GlobalScope

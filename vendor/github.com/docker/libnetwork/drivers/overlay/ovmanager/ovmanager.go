@@ -50,6 +50,7 @@ func Init(dc driverapi.DriverCallback, config map[string]interface{}) error {
 	var err error
 	c := driverapi.Capability{
 		DataScope: datastore.GlobalScope,
+		Multihost: true,
 	}
 
 	d := &driver{
